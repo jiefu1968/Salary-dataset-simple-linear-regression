@@ -1,93 +1,165 @@
 # 📊 Simple Linear Regression Portfolio Project
 
-## 🎯 Objective
+"""
+🎯 Objective:
+Build and evaluate a simple linear regression model using a complete pipeline:
+1. Data loading and inspection
+2. Cleaning and preprocessing
+3. Exploratory Data Analysis (EDA)
+4. Model training and visualization
+5. Performance evaluation with standard and advanced metrics
+6. Final equation for inference
 
-Build and evaluate a simple linear regression model using a complete machine learning pipeline.
+📁 Dataset:
+Salary Dataset - Simple Linear Regression
+Used in the "Machine Learning A - Z" course (Kaggle dataset)
 
-## 📁 Dataset
+💡 Technologies used: Python, Pandas, Scikit-learn, Seaborn, Matplotlib
+"""
 
-- **Name:** Salary Dataset - Simple Linear Regression  
-- **Source:** [Kaggle - Machine Learning A-Z Course](https://www.kaggle.com/datasets)
+# === Imports ===
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import (
+    mean_absolute_error, mean_squared_error, r2_score,
+    median_absolute_error, explained_variance_score,
+    mean_squared_log_error, max_error
+)
+from scipy import stats
 
-## 💡 Technologies Used
+# === 1. Data Collection ===
+from google.colab import files
+uploaded = files.upload()
+df = pd.read_csv(next(iter(uploaded)))
+display(df.head())
 
-- Python
-- Pandas, NumPy
-- Scikit-learn
-- Matplotlib, Seaborn
-- Google Colab
+# === 2. Data Overview ===
+print("\n📋 DataFrame Info")
+df.info()
+print("\n📊 Descriptive Statistics")
+print(df.describe(include='all'))
 
----
+# Rename numeric columns to x and y for simplicity
+expected_cols = ['x', 'y']
+if not all(col in df.columns for col in expected_cols):
+    num_cols = df.select_dtypes(include='number').columns.tolist()
+    if len(num_cols) >= 2:
+        df = df.rename(columns={num_cols[0]: 'x', num_cols[1]: 'y'})
+        print(f"🔁 Renamed '{num_cols[0]}' to 'x' and '{num_cols[1]}' to 'y'")
 
-## 🧭 Project Pipeline
+# === 3. Data Cleaning ===
+df.replace("", np.nan, inplace=True)
+df.dropna(subset=['x', 'y'], inplace=True)
+df = df[(df['x'] != 0) & (df['y'] != 0)]
+z_scores = np.abs(stats.zscore(df[['x', 'y']]))
+df = df[(z_scores < 3).all(axis=1)]
 
-### 1. Data Loading
-- Upload CSV directly in Colab using `files.upload()`.
+# === 4. EDA ===
+print("\nMissing Values:")
+print(df.isnull().sum())
+df.hist(bins=30, figsize=(10, 4), color='skyblue')
+plt.suptitle('Variable Distributions')
+plt.tight_layout()
+plt.show()
 
-### 2. Data Overview
-- Print shape, types, descriptive statistics, and null values.
+plt.figure(figsize=(10, 4))
+plt.subplot(1, 2, 1)
+sns.boxplot(x=df['x'])
+plt.title('Boxplot of x')
+plt.subplot(1, 2, 2)
+sns.boxplot(x=df['y'])
+plt.title('Boxplot of y')
+plt.tight_layout()
+plt.show()
 
-### 3. Data Cleaning
-- Remove NaNs, zeroes, and outliers via Z-score.
+sns.scatterplot(x='x', y='y', data=df)
+plt.title('Scatter Plot: x vs y')
+plt.show()
 
-### 4. EDA (Exploratory Data Analysis)
-- Histograms, boxplots, scatter plots, and correlation matrix.
+sns.heatmap(df.corr(numeric_only=True), annot=True, cmap='coolwarm')
+plt.title('Correlation Matrix')
+plt.show()
 
-### 5. Model Training
-- Pipeline: Imputation → Scaling → Linear Regression.
+# === 5. Model Training ===
+X = df[['x']]
+y = df['y']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+pipeline = Pipeline([
+    ('imputer', SimpleImputer(strategy='median')),
+    ('scaler', StandardScaler()),
+    ('regressor', LinearRegression())
+])
+pipeline.fit(X_train, y_train)
+y_pred_train = pipeline.predict(X_train)
+y_pred_test = pipeline.predict(X_test)
 
-### 6. Regression Equation
-- Display the regression line in the form: `y = a * x + b`.
+# === 6. Regression Equation ===
+coef = pipeline.named_steps['regressor'].coef_[0]
+intercept = pipeline.named_steps['regressor'].intercept_
+print(f"\n📐 Regression Line: y = {coef:.4f} * x + {intercept:.4f}")
 
-### 7. Visualizations
-- Fit line over training/test data.
-- Residuals vs predicted values.
+# === 7. Plot Fit Line ===
+plt.figure(figsize=(10, 6))
+plt.scatter(X_train, y_train, color='blue', label='Training data')
+plt.plot(X_train, y_pred_train, color='navy', label='Train Fit Line')
+plt.scatter(X_test, y_test, color='green', marker='x', s=80, label='Test data')
+plt.plot(X_test, y_pred_test, color='lime', label='Test Predictions')
+plt.title("Linear Regression - Prediction")
+plt.xlabel("x")
+plt.ylabel("y")
+plt.legend()
+plt.grid(True)
+plt.show()
 
-### 8. Model Evaluation
+# === 8. Evaluation Metrics ===
+print("\n✅ Model Evaluation Metrics")
+print("MAE:", mean_absolute_error(y_test, y_pred_test))
+print("MSE:", mean_squared_error(y_test, y_pred_test))
+print("RMSE:", np.sqrt(mean_squared_error(y_test, y_pred_test)))
+print("R²:", r2_score(y_test, y_pred_test))
 
-**Basic Metrics:**
-- MAE, MSE, RMSE
-- R² and Adjusted R²
-- Median AE, Max Error
+def adjusted_r2(r2, n, k):
+    return 1 - (1 - r2) * (n - 1) / (n - k - 1)
 
-**Advanced Metrics:**
-- MAPE, SMAPE
-- MSLE (when applicable)
-- Explained Variance Score
+print("Adjusted R²:", adjusted_r2(r2_score(y_test, y_pred_test), X_test.shape[0], X_test.shape[1]))
+print("Median AE:", median_absolute_error(y_test, y_pred_test))
+print("Explained Variance:", explained_variance_score(y_test, y_pred_test))
+print("Max Error:", max_error(y_test, y_pred_test))
 
----
+# === 9. Advanced Metrics ===
+def mean_absolute_percentage_error(y_true, y_pred):
+    return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
 
-## 📌 Instructions
+def symmetric_mape(y_true, y_pred):
+    return 100 * np.mean(2 * np.abs(y_pred - y_true) / (np.abs(y_true) + np.abs(y_pred)))
 
-You can predict new outputs using the printed regression equation:
-```python
-y = a * x + b
+print("MAPE:", mean_absolute_percentage_error(y_test, y_pred_test))
+print("SMAPE:", symmetric_mape(y_test, y_pred_test))
 
-## 📌 Results (Example)
+if (y_test > 0).all() and (y_pred_test > 0).all():
+    print("MSLE:", mean_squared_log_error(y_test, y_pred_test))
+else:
+    print("MSLE: skipped (requires strictly positive values)")
 
-📊 Descriptive Statistics
-       Unnamed: 0  YearsExperience         Salary
-count   30.000000        30.000000      30.000000
-mean    14.500000         5.413333   76004.000000
-std      8.803408         2.837888   27414.429785
-min      0.000000         1.200000   37732.000000
-25%      7.250000         3.300000   56721.750000
-50%     14.500000         4.800000   65238.000000
-75%     21.750000         7.800000  100545.750000
-max     29.000000        10.600000  122392.000000
+# === 10. Residuals Plot ===
+residuals = y_test - y_pred_test
+plt.figure(figsize=(8, 5))
+plt.scatter(y_pred_test, residuals, color='purple')
+plt.axhline(y=0, color='gray', linestyle='--')
+plt.title("Residuals vs Predicted")
+plt.xlabel("Predicted")
+plt.ylabel("Residuals")
+plt.grid(True)
+plt.show()
 
-✅ Model Evaluation Metrics
-MAE: 0.43114132445431047
-MSE: 0.29537212911990357
-RMSE: 0.5434814892155054
-R²: 0.9522158960665235
-Adjusted R²: 0.9402698700831543
-Median AE: 0.4553690344062167
-Explained Variance: 0.9534275402944385
-Max Error: 0.8085460599334056
-MAPE: 7.527598029053885
-SMAPE: 7.1671371989522115
-MSLE: 0.006224245518426202
+# === Final Inference Instruction ===
+print("\nℹ️ Predict new values using: y = {:.4f} * x + {:.4f}".format(coef, intercept))
 
-Regression Line: y = 2.7357 * x + 5.4391
 
